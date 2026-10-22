@@ -1,0 +1,35 @@
+{
+  "name": "clinic-call-display",
+  "version": "1.0.0",
+  "description": "Kid-friendly clinic waiting hall TV display controlled via Telegram with Google Cloud TTS",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "demo": "DEMO_MODE=true tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.7.0",
+    "grammy": "^1.21.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.24",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.23.15",
+    "typescript": "^5.4.2"
+  },
+  "overrides": {
+    "braces": "3.0.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "esbuild@0.28.2": true
+  }
+}

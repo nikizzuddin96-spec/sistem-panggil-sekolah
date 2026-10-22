@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sistem Panggilan Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /* Menggunakan tema warna rasmi (Dark/Light mode) dari peranti Telegram pengguna */
+    body { 
+      background-color: var(--tg-theme-secondary-bg-color, #f1f5f9); 
+      color: var(--tg-theme-text-color, #0f172a); 
+      font-family: sans-serif; 
+      padding: 20px; 
+      margin: 0;
+    }
+    .header { text-align: center; margin-bottom: 25px; }
+    .header h2 { margin: 0; color: var(--tg-theme-text-color); }
+    .header p { color: var(--tg-theme-hint-color, #64748b); font-size: 0.9rem; margin-top: 5px;}
+    
+    .card { 
+      background-color: var(--tg-theme-bg-color, #ffffff); 
+      padding: 15px; 
+      border-radius: 12px; 
+      margin-bottom: 15px; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    input { 
+      width: 100%; padding: 12px; border: 1px solid var(--tg-theme-hint-color, #cbd5e1); 
+      border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; 
+      background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); 
+    }
+    
+    .btn { 
+      background-color: var(--tg-theme-button-color, #3b82f6); 
+      color: var(--tg-theme-button-text-color, #ffffff); 
+      border: none; padding: 12px 15px; border-radius: 8px; font-weight: bold; 
+      width: 100%; cursor: pointer; font-size: 1rem;
+    }
+    .btn:active { opacity: 0.8; }
+    
+    .kid-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .kid-name { font-size: 1.2rem; font-weight: bold; }
+    
+    .btn-group { display: flex; gap: 10px; }
+    .btn-call { background-color: #10b981; flex: 2; }
+    .btn-delete { background-color: #ef4444; flex: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2 id="welcome">Memuatkan...</h2>
+    <p>Urus senarai dan panggil anak anda terus ke skrin sekolah.</p>
+  </div>
+
+  <div class="card">
+    <input type="text" id="new-kid-name" placeholder="Contoh: Aiman 1B">
+    <button class="btn" onclick="addKid()">➕ Tambah Nama</button>
+  </div>
+
+  <div id="kids-list"></div>
+
+  <script>
+    // Menyambungkan web ini kepada aplikasi Telegram
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Besarkan paparan penuh
+
+    // Dapatkan data pengguna & ID Kelas dari pautan
+    const urlParams = new URLSearchParams(window.location.search);
+    const chatId = urlParams.get('chat_id');
+    const user = tg.initDataUnsafe?.user;
+
+    if (!user || !chatId) {
+        document.getElementById('welcome').innerText = 'Ralat: Sila buka dari Telegram.';
+    } else {
+        document.getElementById('welcome').innerText = 'Hai, ' + user.first_name + '!';
+        loadKids();
+    }
+
+    // Fungsi komunikasi dengan pelayan (Backend)
+    async function apiCall(path, body) {
+        const res = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id.toString(), chatId, ...body })
+        });
+        return res.json();
+    }
+
+    async function loadKids() {
+        const res = await fetch(`/api/miniapp/kids?userId=${user.id}&chatId=${chatId}`);
+        const data = await res.json();
+        renderKids(data.kids);
+    }
+
+    function renderKids(kids) {
+        const list = document.getElementById('kids-list');
+        list.innerHTML = '';
+        if (kids.length === 0) {
+            list.innerHTML = '<div class="card" style="text-align:center;">Tiada nama direkodkan.</div>';
+            return;
+        }
+        kids.forEach(kid => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="kid-item">
+                  <div class="kid-name">${kid}</div>
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-call" onclick="callKid('${kid}')">📢 PANGGIL TV</button>
+                  <button class="btn btn-delete" onclick="removeKid('${kid}')">Padam</button>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    }
+
+    async function addKid() {
+        const name = document.getElementById('new-kid-name').value.trim();
+        if (!name) return tg.showAlert('Sila masukkan nama.');
+        const res = await apiCall('/api/miniapp/add', { name });
+        if (res.error) return tg.showAlert(res.error);
+        
+        document.getElementById('new-kid-name').value = '';
+        tg.HapticFeedback.notificationOccurred('success'); // Getaran telefon
+        loadKids();
+    }
+
+    async function removeKid(name) {
+        tg.showConfirm(`Padam ${name} dari senarai?`, async (yes) => {
+            if (yes) {
+                await apiCall('/api/miniapp/remove', { name });
+                tg.HapticFeedback.notificationOccurred('warning');
+                loadKids();
+            }
+        });
+    }
+
+    async function callKid(name) {
+        const res = await apiCall('/api/miniapp/call', { name, parentName: user.first_name });
+        if (res.error) return tg.showAlert(res.error);
+        
+        tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert('✅ Berjaya memanggil ' + name + ' ke skrin utama!', () => {
+            tg.close(); // Tutup Mini App secara automatik selepas panggil
+        });
+    }
+  </script>
+</body>
+</html>
