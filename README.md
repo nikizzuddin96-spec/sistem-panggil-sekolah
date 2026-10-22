@@ -1,4 +1,4 @@
-# Clinic Children's Waiting Hall "Call Display" App
+# Sistem Panggil Balik Sekolah" App
 
 A real-time TV call display and spoken announcement system controlled by parents from a Telegram group. Built with Node.js (TypeScript), Express, WebSockets, SQLite, and Google Cloud Text-to-Speech (Free Tier guarded).
 
