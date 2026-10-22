@@ -3,41 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 1. Tajuk pada tab pelayar web -->
+    <!-- Tajuk Tab Pelayar Web -->
     <title>Sekolah Rendah Tahfiz Integrasi Al-Furqan</title>
-    <!-- (Kod CSS / pautan stylesheet anda di sini) -->
+    <!-- Rangkaian CSS CDN (Tailwind & Font) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Quicksand', sans-serif; background-color: #f3fbff; }
+        .text-brand { color: #008be2; }
+        .border-brand { border-color: #92d2f8; }
+        .bg-brand-light { background-color: #e8f5fd; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+    </style>
 </head>
-<body>
-
-    <!-- Bahagian Header Atas -->
-    <header>
-        <!-- 2. Tajuk di penjuru atas kiri skrin -->
-        <div class="logo-title">
-            Sekolah Rendah Tahfiz Integrasi Al-Furqan
+<body class="flex flex-col h-screen overflow-hidden">
+    
+    <!-- HEADER UTAMA -->
+    <header class="flex justify-between items-center px-8 py-4 bg-white shadow-sm z-10 border-b border-brand/50">
+        <!-- Nama Penjuru Kiri -->
+        <h1 class="text-3xl font-bold text-brand">Sekolah Rendah Tahfiz Integrasi Al-Furqan</h1>
+        
+        <!-- Jam Waktu Semasa -->
+        <div class="flex items-center space-x-4">
+            <span id="clock" class="text-3xl font-bold text-gray-800">00:00 PM</span>
+            <div class="w-5 h-5 bg-[#20c997] rounded-full animate-pulse shadow-sm"></div>
         </div>
-        <div class="clock" id="clockDisplay">2:24 PM</div>
     </header>
 
-    <!-- Bahagian Tengah Skrin -->
-    <main class="center-content">
-        <!-- 3. Tajuk besar di tengah skrin -->
-        <h1>Sistem Panggilan Pelajar</h1>
-        <p>Sila tunggu nama anak anda dipanggil ✨</p>
-        
-        <!-- Kotak paparan nama yang sedang dipanggil -->
-        <div id="currentCallBox"></div>
+    <!-- PAPARAN TENGAH SKRIN -->
+    <main class="flex-1 p-6 relative">
+        <div class="absolute inset-6 border-[3px] border-dashed border-brand bg-white rounded-[2.5rem] flex flex-col items-center justify-center text-center p-8 shadow-sm">
+            
+            <!-- Paparan Ketika Tiada Panggilan -->
+            <div id="idleState">
+                <!-- Nama Tengah Skrin -->
+                <h2 class="text-6xl font-bold text-brand mb-6">Sistem Panggilan Pelajar</h2>
+                <p class="text-3xl text-gray-600 font-bold">Sila tunggu nama anak anda dipanggil ✨</p>
+            </div>
+            
+            <!-- Paparan Ketika Nama Dipanggil (Pop-up) -->
+            <div id="callState" class="hidden flex-col items-center animate-bounce">
+                <div class="text-[5rem] leading-tight font-bold text-gray-800 mb-6" id="callName">Nama Pelajar</div>
+                <div class="text-5xl font-bold text-brand bg-brand-light border-2 border-brand px-10 py-4 rounded-full shadow-sm" id="callNote">Bilik 1</div>
+            </div>
+            
+        </div>
     </main>
 
-    <!-- Bahagian Bawah (Baru Dipanggil) -->
-    <footer>
-        <div class="recent-title">Baru Dipanggil<br>Recently Called</div>
-        <div id="recentCallsList"></div>
+    <!-- FOOTER BAWAH (SEJARAH PANGGILAN) -->
+    <footer class="bg-white border-t border-gray-200 px-6 py-4 flex items-center shadow-inner z-10">
+        <div class="mr-6 shrink-0 border-r-2 border-gray-200 pr-6">
+            <div class="text-2xl font-bold text-gray-700">Baru Dipanggil</div>
+            <div class="text-lg text-gray-500 font-bold">Recently Called</div>
+        </div>
+        <div class="flex space-x-4 overflow-x-auto hide-scroll w-full py-2" id="recentCalls">
+            <!-- Kotak sejarah panggilan akan dijana secara automatik di sini -->
+        </div>
     </footer>
 
-    <!-- PENTING: JANGAN USIK KOD JAVASCRIPT DI BAWAH INI -->
+    <!-- LOGIK SISTEM (JANGAN UBAH BAHAGIAN INI) -->
     <script>
-        // Kod WebSocket, fungsi jam, dan pemain audio TTS asal anda berada di sini
-        // Biarkan ia kekal seperti asal supaya sistem terus berfungsi!
+        // --- LOGIK JAM ---
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('clock').innerText = hours + ':' + minutes + ' ' + ampm;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- LOGIK AUDIO TTS & PAPARAN NAMA ---
+        const audioQueue = [];
+        let isPlaying = false;
+
+        const idleState = document.getElementById('idleState');
+        const callState = document.getElementById('callState');
+        const callName = document.getElementById('callName');
+        const callNote = document.getElementById('callNote');
+        const recentCalls = document.getElementById('recentCalls');
+
+        async function playNextAudio() {
+            if (isPlaying || audioQueue.length === 0) return;
+            isPlaying = true;
+            
+            const item = audioQueue.shift();
+            
+            // Tunjuk nama besar di skrin
+            idleState.classList.add('hidden');
+            callState.classList.remove('hidden');
+            callState.classList.add('flex');
+            
+            callName.innerText = item.name;
+            callNote.innerText = item.note || 'Sila ke kawasan menunggu';
+
+            try {
+                // Hantar isyarat ke pelayan untuk minta suara Google TTS
+                const res = await fetch('/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: item.name, note: item.note })
+                });
+                const data = await res.json();
+                
+                if (data.audioContent) {
+                    const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
+                    audio.onended = () => {
+                        setTimeout(() => {
+                            resetAndNext();
+                        }, 4000); // Skrin nama kekal 4 saat selepas suara habis
+                    };
+                    await audio.play();
+                } else {
+                    resetAndNext();
+                }
+            } catch (e) {
+                console.error('Ralat Audio:', e);
+                resetAndNext();
+            }
+        }
+
+        function resetAndNext() {
+            callState.classList.add('hidden');
+            callState.classList.remove('flex');
+            idleState.classList.remove('hidden');
+            isPlaying = false;
+            playNextAudio();
+        }
+
+        // --- LOGIK SEJARAH PANGGILAN BAWAH (RECENT CALLS) ---
+        function formatTime(isoString) {
+            if (!isoString) return '';
+            const d = new Date(isoString);
+            let h = d.getHours();
+            let m = d.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12; h = h ? h : 12;
+            m = m < 10 ? '0' + m : m;
+            return `[${h}:${m} ${ampm}]`;
+        }
+
+        function updateRecentCalls(history) {
+            recentCalls.innerHTML = '';
+            history.slice(0, 8).forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center space-x-3 bg-brand-light border-2 border-brand/40 text-gray-800 px-6 py-3 rounded-2xl whitespace-nowrap shrink-0 shadow-sm';
+                div.innerHTML = `
+                    <span class="text-base font-bold text-gray-500">${formatTime(item.created_at)}</span>
+                    <span class="text-2xl font-bold text-gray-900">${item.name}</span>
+                    ${item.note ? `<span class="text-xl font-bold text-brand">${item.note}</span>` : ''}
+                `;
+                recentCalls.appendChild(div);
+            });
+        }
+
+        // --- LOGIK WEBSOCKET (MENERIMA PANGGILAN TELEGRAM) ---
+        function connectWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'HISTORY') {
+                        updateRecentCalls(data.history);
+                    } else if (data.type === 'CALL') {
+                        audioQueue.push(data.item);
+                        playNextAudio();
+                        fetchHistory();
+                    }
+                } catch(e) { console.error('Ralat WebSocket:', e); }
+            };
+
+            ws.onclose = () => {
+                setTimeout(connectWS, 3000); // Sambung semula jika terputus
+            };
+        }
+
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/history');
+                const data = await res.json();
+                if (data.history) updateRecentCalls(data.history);
+            } catch (e) {}
+        }
+
+        // Mulakan sistem bila halaman dibuka
+        fetchHistory();
+        connectWS();
     </script>
 </body>
 </html>
