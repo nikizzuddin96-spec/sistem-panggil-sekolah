@@ -192,15 +192,17 @@ function toggleDemoMode() {
 
 // --- Startup ---
 async function bootstrap() {
-  // Matikan prewarm sementara untuk menjimatkan penggunaan RAM di Render
-  // await prewarmFixedPhrases();
-
   const bot = initTelegramBot();
   if (bot) {
     if (CONFIG.webhookUrl) {
+      // Pasang laluan penerima webhook daripada Telegram
       app.use('/telegram-webhook', webhookCallback(bot, 'express'));
-      await bot.api.setWebhook(`${CONFIG.webhookUrl}/telegram-webhook`);
-      console.log(`[Telegram] Webhook registered at ${CONFIG.webhookUrl}/telegram-webhook`);
+      console.log(`[Telegram] Webhook route ready at /telegram-webhook`);
+
+      // Cuba daftarkan webhook di latar belakang tanpa menghalang pelayan dimulakan
+      bot.api.setWebhook(`${CONFIG.webhookUrl}/telegram-webhook`).catch((err) => {
+        console.warn('[Telegram] Gagal auto-set webhook (Network timeout). Pastikan webhook diset manual melalui browser.');
+      });
     } else {
       bot.start({
         onStart: (info) => console.log(`[Telegram] Bot @${info.username} running via long polling`),
