@@ -34,7 +34,7 @@ app.get('/history', (_req, res) => {
 // Internal endpoint used by Display or Admin to synthesize speech on demand
 app.post('/tts', async (req, res) => {
   const { name, note } = req.body || {};
-  const parsed = parseCallInput(note ? `${name} - ${note}` : String(name || ''));
+  const parsed = parseCallInput(note ? `${name}\n${note}` : String(name || ''));
   if (!parsed.valid) {
     return res.status(400).json({ error: parsed.error });
   }
@@ -192,7 +192,8 @@ function toggleDemoMode() {
 
 // --- Startup ---
 async function bootstrap() {
-  await prewarmFixedPhrases();
+  // Matikan prewarm sementara untuk menjimatkan penggunaan RAM di Render
+  // await prewarmFixedPhrases();
 
   const bot = initTelegramBot();
   if (bot) {
